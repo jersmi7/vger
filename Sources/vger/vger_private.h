@@ -30,6 +30,7 @@ struct TextLayoutKey {
     float size;
     int align;
     float breakRowWidth = -1;
+    int font = 0;
 };
 
 inline void hash_combine(size_t& seed) { }
@@ -55,7 +56,7 @@ namespace std {\
     };\
 }
 
-MAKE_HASHABLE(TextLayoutKey, t.str, t.size, t.align, t.breakRowWidth);
+MAKE_HASHABLE(TextLayoutKey, t.str, t.size, t.align, t.breakRowWidth, t.font);
 
 /// Main state object. This is not ObjC to avoid call overhead for each prim.
 struct vger {
@@ -159,6 +160,16 @@ struct vger {
     bool computedGlyphBounds = false;
 
     vger(uint32_t flags);
+    ~vger();
+
+    /// Fonts owned by this context. Index 0 is the built-in Anodina.
+    std::vector<CTFontRef> fonts;
+
+    /// Index into fonts used by text calls.
+    int currentFont = 0;
+
+    /// Load a font from a URL and add it to fonts. Returns its index, or -1.
+    int loadFont(CFURLRef url);
 
     void addCV(float2 p) {
         if(cvCount < maxCvs) {

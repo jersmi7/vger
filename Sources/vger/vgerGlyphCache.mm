@@ -4,11 +4,12 @@
 #import "vgerTextureManager.h"
 #import "vgerBundleHelper.h"
 #include <vector>
+#include <unordered_map>
 
 @interface vgerGlyphCache() {
     vgerTextureManager* mgr;
-    std::vector< std::vector<GlyphInfo> > glyphs;
-    CTFontRef ctFont;
+    /// Glyph infos per font (keyed by the font the vger context owns), then by glyph.
+    std::unordered_map< CTFontRef, std::vector< std::vector<GlyphInfo> > > glyphs;
 }
 @end
 
@@ -18,32 +19,19 @@
     self = [super init];
     if (self) {
         mgr = [[vgerTextureManager alloc] initWithDevice:device pixelFormat:MTLPixelFormatA8Unorm];
-
-        auto bundle = [vgerBundleHelper moduleBundle];
-        assert(bundle);
-
-        auto fontURL = [bundle URLForResource:@"Anodina-Regular" withExtension:@"ttf" subdirectory:@"fonts"];
-
-        auto fd = CTFontManagerCreateFontDescriptorsFromURL( (__bridge CFURLRef) fontURL);
-        ctFont = CTFontCreateWithFontDescriptor( (CTFontDescriptorRef) CFArrayGetValueAtIndex(fd, 0), 12.0, nil);
-        assert(ctFont);
-        CFRelease(fd);
-        //ctFont = CTFontCreateWithName((__bridge CFStringRef)@"Avenir-light", /*fontPointSize*/24, NULL);
     }
     return self;
 }
 
-- (void) dealloc {
-    CFRelease(ctFont);
-}
+- (GlyphInfo) getGlyph:(CGGlyph)glyph font:(CTFontRef)ctFont scale:(float) scale {
 
-- (GlyphInfo) getGlyph:(CGGlyph)glyph scale:(float) scale {
+    auto& fontGlyphs = glyphs[ctFont];
 
-    if(glyph >= glyphs.size()) {
-        glyphs.resize(glyph+1);
+    if(glyph >= fontGlyphs.size()) {
+        fontGlyphs.resize(glyph+1);
     }
 
-    auto& v = glyphs[glyph];
+    auto& v = fontGlyphs[glyph];
 
     for(auto& info : v) {
         if(info.size == scale) {
@@ -131,10 +119,6 @@
 
 - (stbrp_rect*) getRects {
     return [mgr getRects];
-}
-
-- (CTFontRef) getFont {
-    return ctFont;
 }
 
 - (float) usage {

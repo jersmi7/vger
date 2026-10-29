@@ -25,7 +25,7 @@ struct GlyphInfo {
 
 - (instancetype)initWithDevice:(id<MTLDevice>) device;
 
-- (GlyphInfo) getGlyph:(CGGlyph)glyph scale:(float)scale;
+- (GlyphInfo) getGlyph:(CGGlyph)glyph font:(CTFontRef)font scale:(float)scale;
 
 - (void) update:(id<MTLCommandBuffer>) buffer;
 
@@ -33,8 +33,6 @@ struct GlyphInfo {
 
 /// Get a pointer to the first rectangle.
 - (stbrp_rect*) getRects;
-
-- (CTFontRef) getFont;
 
 @end
 

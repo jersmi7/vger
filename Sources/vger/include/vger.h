@@ -20,6 +20,7 @@
 
 #ifndef __METAL_VERSION__
 #include <simd/simd.h>
+#include <CoreFoundation/CoreFoundation.h>
 #endif
 
 /// Text alignment.
@@ -113,6 +114,22 @@ void vgerStrokeSegment(vgerContext, vector_float2 a, vector_float2 b, float widt
 void vgerStrokeWire(vgerContext, vector_float2 a, vector_float2 b, float width, vgerPaintIndex paint);
 
 #pragma mark - Text
+
+/// Font 0 is the built-in Anodina, and is the default.
+/// Fonts are per-context. Loading fonts does not change the current font.
+
+/// Load a font from a file. Returns a font ID (> 0), or -1 on failure
+/// (in which case the current font is unchanged).
+int vgerLoadFont(vgerContext, CFURLRef url);
+
+/// Load a font bundled with vger (from the "fonts" resources) by file name
+/// without extension, e.g. "Barlow-Regular". Returns a font ID (> 0), or -1
+/// on failure.
+int vgerLoadBundledFont(vgerContext, const char* name);
+
+/// Select the font used by subsequent text calls. Returns false (and leaves
+/// the current font unchanged) if fontID is not valid.
+bool vgerSetFont(vgerContext, int fontID);
 
 /// Render text.
 void vgerText(vgerContext, const char* str, vector_float4 color, int align);

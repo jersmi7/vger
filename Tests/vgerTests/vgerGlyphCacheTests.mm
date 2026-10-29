@@ -23,9 +23,13 @@
 
     auto cache = [[vgerGlyphCache alloc] initWithDevice:device];
 
+    auto font = CTFontCreateWithName((__bridge CFStringRef)@"Helvetica", 12.0, NULL);
+
     for(int i=0;i<100;++i) {
-        [cache getGlyph:i scale:1.0f];
+        [cache getGlyph:i font:font scale:1.0f];
     }
+
+    CFRelease(font);
 
     id<MTLCommandBuffer> buf = [queue commandBuffer];
     [cache update:buf];

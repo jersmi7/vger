@@ -14,6 +14,7 @@
 #import "vgerRenderer.h"
 #import "vgerTextureManager.h"
 #import "vgerGlyphCache.h"
+#import "vgerBundleHelper.h"
 #import "vgerTileRenderer.h"
 
 using namespace simd;
@@ -21,7 +22,47 @@ using namespace simd;
 #import "bezier.h"
 #import "vger_private.h"
 
+vger::~vger() {
+    for(auto font : fonts) {
+        CFRelease(font);
+    }
+}
+
+int vger::loadFont(CFURLRef url) {
+
+    if(url == nullptr) {
+        return -1;
+    }
+
+    auto descriptors = CTFontManagerCreateFontDescriptorsFromURL(url);
+    if(descriptors == nullptr) {
+        return -1;
+    }
+
+    CTFontRef font = nullptr;
+    if(CFArrayGetCount(descriptors) > 0) {
+        font = CTFontCreateWithFontDescriptor((CTFontDescriptorRef) CFArrayGetValueAtIndex(descriptors, 0), 12.0, nil);
+    }
+    CFRelease(descriptors);
+
+    if(font == nullptr) {
+        return -1;
+    }
+
+    fonts.push_back(font);
+    return int(fonts.size()) - 1;
+}
+
 vger::vger(uint32_t flags) {
+
+    // Font 0 is the built-in Anodina.
+    auto bundle = [vgerBundleHelper moduleBundle];
+    assert(bundle);
+    auto anodinaURL = [bundle URLForResource:@"Anodina-Regular" withExtension:@"ttf" subdirectory:@"fonts"];
+    auto defaultFont = loadFont((__bridge CFURLRef) anodinaURL);
+    assert(defaultFont == 0);
+    (void) defaultFont;
+
     device = MTLCreateSystemDefaultDevice();
     renderer = [[vgerRenderer alloc] initWithDevice:device pixelFormat:MTLPixelFormatBGRA8Unorm];
     glowRenderer = [[vgerRenderer alloc] initWithDevice:device pixelFormat:MTLPixelFormatRGBA16Unorm];
@@ -349,6 +390,28 @@ static float2 alignOffset(CTLineRef line, int align) {
     return t;
 }
 
+int vgerLoadFont(vgerContext vg, CFURLRef url) {
+    return vg->loadFont(url);
+}
+
+int vgerLoadBundledFont(vgerContext vg, const char* name) {
+    assert(name);
+    auto bundle = [vgerBundleHelper moduleBundle];
+    auto url = [bundle URLForResource:[NSString stringWithUTF8String:name] withExtension:@"ttf" subdirectory:@"fonts"];
+    if(url == nil) {
+        return -1;
+    }
+    return vg->loadFont((__bridge CFURLRef) url);
+}
+
+bool vgerSetFont(vgerContext vg, int fontID) {
+    if(fontID < 0 || fontID >= int(vg->fonts.size())) {
+        return false;
+    }
+    vg->currentFont = fontID;
+    return true;
+}
+
 void vgerText(vgerContext vg, const char* str, float4 color, int align) {
     vg->renderText(str, color, align);
 }
@@ -392,7 +455,7 @@ void vger::renderTextLine(CTLineRef line, TextLayoutInfo& textInfo, vgerPaintInd
 
         for(int i=0;i<glyphCount;++i) {
 
-            auto info = [glyphCache getGlyph:glyphs[i] scale:scale];
+            auto info = [glyphCache getGlyph:glyphs[i] font:fonts[currentFont] scale:scale];
             if(info.regionIndex != -1) {
 
                 CGRect r = CTRunGetImageBounds(run, nil, CFRangeMake(i, 1));
@@ -464,7 +527,7 @@ CTLineRef vger::createCTLine(const char* str) {
 
     assert(str);
 
-    auto attributes = @{ NSFontAttributeName : (__bridge id)glyphPathCache.ctFont };
+    auto attributes = @{ NSFontAttributeName : (__bridge id)fonts[currentFont] };
     auto string = [NSString stringWithUTF8String:str];
     assert(string);
     auto attrString = [[NSAttributedString alloc] initWithString:string attributes:attributes];
@@ -517,7 +580,7 @@ void vger::renderText(const char* str, float4 color, int align) {
     } else {
 
         auto scale = averageScale(txStack.back()) * devicePxRatio;
-        auto key = TextLayoutKey{std::string(str), scale, align};
+        auto key = TextLayoutKey{std::string(str), scale, align, -1, currentFont};
         
         if(renderCachedText(key, paint, xform)) {
             return;
@@ -580,7 +643,7 @@ CTFrameRef vger::createCTFrame(const char* str, int align, float breakRowWidth) 
     } else if(align & VGER_ALIGN_RIGHT) {
         paragraphStyle.alignment = NSTextAlignmentRight;
     }
-    auto attributes = @{ NSFontAttributeName : (__bridge id)[glyphCache getFont],
+    auto attributes = @{ NSFontAttributeName : (__bridge id)fonts[currentFont],
                          NSParagraphStyleAttributeName : paragraphStyle
     };
     auto string = [NSString stringWithUTF8String:str];
@@ -608,7 +671,7 @@ void vger::renderTextBox(const char* str, float breakRowWidth, float4 color, int
 
     auto paint = vgerColorPaint(this, color);
     auto scale = averageScale(txStack.back()) * devicePxRatio;
-    auto key = TextLayoutKey{std::string(str), scale, align, breakRowWidth};
+    auto key = TextLayoutKey{std::string(str), scale, align, breakRowWidth, currentFont};
     auto xform = addxform(txStack.back());
 
     if(renderCachedText(key, paint, xform)) {

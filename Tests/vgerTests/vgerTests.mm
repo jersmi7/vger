@@ -301,6 +301,74 @@ static void SplitBezier(float t,
 
 }
 
+- (void) testFonts {
+
+    auto vger = vgerNew(0);
+
+    // Built-in font is the default, so bad IDs must not change it.
+    XCTAssertFalse(vgerSetFont(vger, 1));
+    XCTAssertFalse(vgerSetFont(vger, -1));
+    XCTAssertEqual(vgerLoadBundledFont(vger, "NoSuchFont"), -1);
+
+    auto light = vgerLoadBundledFont(vger, "Barlow-Light");
+    auto regular = vgerLoadBundledFont(vger, "Barlow-Regular");
+    auto medium = vgerLoadBundledFont(vger, "Barlow-Medium");
+    auto semibold = vgerLoadBundledFont(vger, "Barlow-SemiBold");
+    auto mono = vgerLoadBundledFont(vger, "JetBrainsMono-Regular");
+    XCTAssertEqual(light, 1);
+    XCTAssertEqual(regular, 2);
+    XCTAssertEqual(medium, 3);
+    XCTAssertEqual(semibold, 4);
+    XCTAssertEqual(mono, 5);
+
+    // Measure the same string in each font. Different fonts must give different bounds.
+    auto width = [&](int font) {
+        XCTAssertTrue(vgerSetFont(vger, font));
+        float2 mn, mx;
+        vgerTextBounds(vger, "Cutoff 440 Hz", &mn, &mx, VGER_ALIGN_LEFT);
+        return mx.x - mn.x;
+    };
+    auto anodina = width(0);
+    auto wLight = width(light);
+    auto wRegular = width(regular);
+    auto wSemibold = width(semibold);
+    auto wMono = width(mono);
+    XCTAssertNotEqualWithAccuracy(anodina, wRegular, 0.01);
+    XCTAssertNotEqualWithAccuracy(wLight, wSemibold, 0.01);
+    XCTAssertNotEqualWithAccuracy(wRegular, wMono, 0.01);
+
+    // Render the same string in several fonts, to check the glyph cache
+    // and text cache keep fonts separate.
+    vgerBegin(vger, 512, 512, 1.0);
+    int fonts[] = {0, light, regular, medium, semibold, mono};
+    float y = 40;
+    for(int f : fonts) {
+        vgerSetFont(vger, f);
+        vgerSave(vger);
+        vgerTranslate(vger, float2{20, y});
+        vgerScale(vger, float2{2, 2});
+        vgerText(vger, "Cutoff 440 Hz", float4{1,1,1,1}, VGER_ALIGN_LEFT);
+        vgerRestore(vger);
+        y += 60;
+    }
+
+    auto commandBuffer = [queue commandBuffer];
+    vgerEncode(vger, commandBuffer, pass);
+
+    #if TARGET_OS_OSX
+    auto blitEncoder = [commandBuffer blitCommandEncoder];
+    [blitEncoder synchronizeResource:texture];
+    [blitEncoder endEncoding];
+    #endif
+
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
+
+    showTexture(texture, @"fonts.png");
+
+    vgerDelete(vger);
+}
+
 - (void) testScaleText {
 
     auto vger = vgerNew(0);
