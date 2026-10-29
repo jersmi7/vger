@@ -125,6 +125,18 @@ int vgerLoadFont(vgerContext, CFURLRef url);
 /// Load a font bundled with vger (from the "fonts" resources) by file name
 /// without extension, e.g. "Barlow-Regular". Returns a font ID (> 0), or -1
 /// on failure.
+///
+/// Currently bundled (Sources/vger/fonts/):
+///   - "Anodina-Regular"        built-in default, always font 0 (no need to load)
+///   - "Barlow-Light"
+///   - "Barlow-Regular"
+///   - "Barlow-Medium"
+///   - "Barlow-SemiBold"
+///   - "JetBrainsMono-Regular"
+///
+/// Barlow and JetBrains Mono are licensed under the SIL Open Font License 1.1
+/// (see OFL-Barlow.txt and OFL-JetBrainsMono.txt in the fonts folder). If you
+/// add another font file there, add it to this list too.
 int vgerLoadBundledFont(vgerContext, const char* name);
 
 /// Select the font used by subsequent text calls. Returns false (and leaves
